@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\CardOrderController;
 use App\Http\Controllers\Api\V1\CloudiTapLandingController;
 use App\Http\Controllers\Api\V1\CouponController;
 use App\Http\Controllers\Api\V1\LinkPageController;
+use App\Http\Controllers\Api\V1\MediaAssetController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\StripeWebhookController;
 use App\Models\LinkPage;
@@ -48,6 +49,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/public/cards/{card}/link-page', [LinkPageController::class, 'publicShowByCard']);
     Route::post('/public/cards/{card}/events', [AnalyticsController::class, 'storePublicCardEvent']);
     Route::get('/public/clouditap', [CloudiTapLandingController::class, 'public']);
+    Route::get('/media/{media}', [MediaAssetController::class, 'show'])->whereNumber('media');
     Route::post('/stripe/webhook', [StripeWebhookController::class, 'handle']);
     Route::get('/public/link-page/{slug}', function (Request $request, string $slug) {
         $linkPage = LinkPage::where('slug', $slug)->firstOrFail();

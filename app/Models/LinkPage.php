@@ -144,6 +144,8 @@ class LinkPage extends Model implements HasMedia
      */
     public function mediaPayload(Media $media): array
     {
+        $mediaUrl = url("/api/v1/media/{$media->id}");
+
         return [
             'id' => $media->id,
             'name' => $media->name,
@@ -152,8 +154,10 @@ class LinkPage extends Model implements HasMedia
             'size' => $media->size,
             'collection' => $media->collection_name,
             'disk' => $media->disk,
-            'original_url' => $media->getFullUrl(),
-            'url' => $media->getUrl(),
+            'original_url' => $mediaUrl,
+            'url' => $mediaUrl,
+            'storage_original_url' => $media->getFullUrl(),
+            'storage_url' => $media->getUrl(),
             'custom_properties' => $media->custom_properties,
         ];
     }
@@ -200,8 +204,11 @@ class LinkPage extends Model implements HasMedia
             $media = $mediaByBannerId->get($bannerId);
 
             if ($media) {
+                $mediaUrl = url("/api/v1/media/{$media->id}");
+
                 $banner['media_id'] = $media->id;
-                $banner['image_url'] = $media->getFullUrl();
+                $banner['image_url'] = $mediaUrl;
+                $banner['storage_image_url'] = $media->getFullUrl();
             }
 
             return $banner;

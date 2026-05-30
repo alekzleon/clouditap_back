@@ -131,6 +131,8 @@ class Card extends Model implements HasMedia
      */
     public function mediaPayload(Media $media): array
     {
+        $mediaUrl = url("/api/v1/media/{$media->id}");
+
         return [
             'id' => $media->id,
             'name' => $media->name,
@@ -139,8 +141,10 @@ class Card extends Model implements HasMedia
             'size' => $media->size,
             'collection' => $media->collection_name,
             'disk' => $media->disk,
-            'original_url' => $media->getFullUrl(),
-            'url' => $media->getUrl(),
+            'original_url' => $mediaUrl,
+            'url' => $mediaUrl,
+            'storage_original_url' => $media->getFullUrl(),
+            'storage_url' => $media->getUrl(),
         ];
     }
 }
