@@ -95,4 +95,14 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserCardCredit::class);
     }
+
+    public function courtesyGrants(): HasMany
+    {
+        return $this->hasMany(CourtesyGrant::class);
+    }
+
+    public function assignedCoupons(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Coupon::class, 'coupon_user')->withTimestamps();
+    }
 }

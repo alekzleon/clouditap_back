@@ -474,8 +474,13 @@ class AdminController extends Controller
             'type' => $order->type,
             'status' => $order->status,
             'quantity' => $order->quantity,
+            'subtotal_amount' => $order->subtotal_amount,
+            'discount_amount' => $order->discount_amount,
             'amount' => $order->amount,
             'currency' => $order->currency,
+            'coupon_id' => $order->coupon_id,
+            'promotion_id' => $order->promotion_id,
+            'discounts' => $order->discount_breakdown ?? [],
             'paid_at' => $order->paid_at,
             'user' => $order->user ? [
                 'id' => $order->user->id,

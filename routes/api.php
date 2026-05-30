@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AdminController;
+use App\Http\Controllers\Api\V1\AdminCouponController;
+use App\Http\Controllers\Api\V1\AdminCourtesyController;
+use App\Http\Controllers\Api\V1\AdminPromotionController;
 use App\Http\Controllers\Api\V1\AnalyticsController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CardController;
@@ -8,6 +11,7 @@ use App\Http\Controllers\Api\V1\CardCreditController;
 use App\Http\Controllers\Api\V1\CardDesignController;
 use App\Http\Controllers\Api\V1\CardOrderController;
 use App\Http\Controllers\Api\V1\CloudiTapLandingController;
+use App\Http\Controllers\Api\V1\CouponController;
 use App\Http\Controllers\Api\V1\LinkPageController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\StripeWebhookController;
@@ -58,6 +62,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/users/{user}', [AdminController::class, 'user']);
             Route::get('/orders', [AdminController::class, 'orders']);
             Route::get('/orders/{order}', [AdminController::class, 'order']);
+            Route::get('/courtesies', [AdminCourtesyController::class, 'index']);
+            Route::post('/courtesies', [AdminCourtesyController::class, 'store']);
+            Route::apiResource('coupons', AdminCouponController::class);
+            Route::apiResource('promotions', AdminPromotionController::class);
             Route::get('/prints', [AdminController::class, 'printOrders']);
             Route::get('/prints/{printJob}', [AdminController::class, 'printOrder']);
             Route::get('/prints/{printJob}/order-info', [AdminController::class, 'printOrderInfo']);
@@ -96,6 +104,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/card-orders', [CardOrderController::class, 'store']);
         Route::post('/card-orders/{order}/sync-payment', [CardOrderController::class, 'syncPayment']);
         Route::post('/card-orders/{order}/simulate-payment', [CardOrderController::class, 'simulatePayment']);
+        Route::post('/coupons/validate-card-order', [CouponController::class, 'validateForCardOrder']);
 
         Route::prefix('profile')->group(function (): void {
             Route::get('/', [ProfileController::class, 'show']);

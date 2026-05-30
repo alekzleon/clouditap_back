@@ -23,6 +23,11 @@ class Order extends Model
         'type',
         'status',
         'quantity',
+        'subtotal_amount',
+        'discount_amount',
+        'coupon_id',
+        'promotion_id',
+        'discount_breakdown',
         'amount',
         'currency',
         'payment_provider',
@@ -37,6 +42,9 @@ class Order extends Model
     {
         return [
             'quantity' => 'integer',
+            'subtotal_amount' => 'integer',
+            'discount_amount' => 'integer',
+            'discount_breakdown' => 'array',
             'amount' => 'integer',
             'shipping_address' => 'array',
             'paid_at' => 'datetime',
@@ -51,6 +59,16 @@ class Order extends Model
     public function card(): BelongsTo
     {
         return $this->belongsTo(Card::class);
+    }
+
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
+    public function promotion(): BelongsTo
+    {
+        return $this->belongsTo(Promotion::class);
     }
 
     public function statusLogs(): HasMany

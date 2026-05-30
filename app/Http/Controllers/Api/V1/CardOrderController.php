@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\UserCardCredit;
+use App\Services\CardOrderPricingService;
 use App\Services\CardPurchasePaymentService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
 
@@ -20,6 +22,7 @@ class CardOrderController extends Controller
 
     public function __construct(
         private readonly CardPurchasePaymentService $paymentService,
+        private readonly CardOrderPricingService $pricingService,
     ) {}
 
     public function store(Request $request): JsonResponse
@@ -28,6 +31,7 @@ class CardOrderController extends Controller
 
         $validator = Validator::make($request->all(), [
             'quantity' => ['sometimes', 'integer', 'min:1', "max:{$maxQuantity}"],
+            'coupon_code' => ['nullable', 'string', 'max:60'],
             'payment_provider' => ['sometimes', 'string', Rule::in(['stripe'])],
             ...$this->shippingAddressRules(),
         ], [
@@ -45,7 +49,18 @@ class CardOrderController extends Controller
         $quantity = (int) ($validator->validated()['quantity'] ?? 1);
         $paymentProvider = $validator->validated()['payment_provider'] ?? 'stripe';
         $shippingAddress = $validator->validated()['shipping_address'] ?? $request->user()->shipping_address;
-        $price = $this->cardPrice();
+
+        try {
+            $quote = $this->pricingService->quote(
+                $request->user(),
+                $quantity,
+                $validator->validated()['coupon_code'] ?? null,
+            );
+        } catch (ValidationException $exception) {
+            return $this->error($exception->getMessage() ?: 'El cupón no es válido.', [
+                'errors' => $exception->errors(),
+            ], 422);
+        }
 
         $order = Order::create([
             'user_id' => $request->user()->id,
@@ -54,20 +69,35 @@ class CardOrderController extends Controller
             'type' => Order::TYPE_CARD_PURCHASE,
             'status' => 'pending_payment',
             'quantity' => $quantity,
-            'amount' => $price['amount'] * $quantity,
-            'currency' => $price['currency'],
-            'payment_provider' => $paymentProvider,
-            'payment_status' => 'pending',
+            'subtotal_amount' => $quote['subtotal_amount'],
+            'discount_amount' => $quote['discount_amount'],
+            'coupon_id' => $quote['coupon']?->id,
+            'promotion_id' => $quote['promotion']?->id,
+            'discount_breakdown' => $quote['discounts'],
+            'amount' => $quote['total_amount'],
+            'currency' => $quote['currency'],
+            'payment_provider' => $quote['total_amount'] > 0 ? $paymentProvider : 'courtesy',
+            'payment_status' => $quote['total_amount'] > 0 ? 'pending' : 'succeeded',
             'shipping_address' => $shippingAddress,
         ]);
 
-        return $this->createStripePaymentIntent($order, $price);
+        if ($order->amount === 0) {
+            $result = $this->paymentService->markOrderAsPaid($order);
+
+            return $this->success([
+                'order' => $this->orderPayload($result['order']),
+                'credits' => $this->creditsPayload($result['credits']),
+                'payment' => null,
+            ], 'Orden cubierta por descuentos. Ya puedes crear otra tarjeta.', 201);
+        }
+
+        return $this->createStripePaymentIntent($order, $quote);
     }
 
     /**
      * @param  array<string, mixed>  $price
      */
-    private function createStripePaymentIntent(Order $order, array $price): JsonResponse
+    private function createStripePaymentIntent(Order $order, array $quote): JsonResponse
     {
         try {
             $paymentIntent = $this->stripe()->paymentIntents->create([
@@ -82,8 +112,12 @@ class CardOrderController extends Controller
                     'user_id' => (string) $order->user_id,
                     'type' => $order->type,
                     'quantity' => (string) $order->quantity,
-                    'unit_amount' => (string) $price['amount'],
+                    'unit_amount' => (string) $quote['unit_amount'],
+                    'subtotal_amount' => (string) $order->subtotal_amount,
+                    'discount_amount' => (string) $order->discount_amount,
                     'total_amount' => (string) $order->amount,
+                    'coupon_id' => (string) $order->coupon_id,
+                    'promotion_id' => (string) $order->promotion_id,
                     'has_shipping_address' => $order->shipping_address ? 'true' : 'false',
                 ],
             ], [
@@ -201,8 +235,8 @@ class CardOrderController extends Controller
     private function cardPrice(): array
     {
         return [
-            'amount' => (int) env('CARD_PURCHASE_AMOUNT_CENTS', 64900),
-            'currency' => strtolower((string) env('CARD_PURCHASE_CURRENCY', 'mxn')),
+            'amount' => $this->pricingService->cardUnitAmount(),
+            'currency' => $this->pricingService->currency(),
         ];
     }
 
@@ -223,18 +257,25 @@ class CardOrderController extends Controller
             'number' => $order->number,
             'status' => $order->status,
             'quantity' => $order->quantity,
+            'subtotal_amount' => $order->subtotal_amount ?? $price['amount'] * $order->quantity,
+            'discount_amount' => $order->discount_amount,
             'amount' => $order->amount,
             'currency' => $order->currency,
             'payment_provider' => $order->payment_provider,
             'payment_status' => $order->payment_status,
             'unit_amount' => $price['amount'],
             'total_amount' => $order->amount,
+            'coupon_id' => $order->coupon_id,
+            'promotion_id' => $order->promotion_id,
+            'discounts' => $order->discount_breakdown ?? [],
             'shipping_address' => $order->shipping_address,
             'line_items' => [
                 [
                     'name' => 'Tarjeta TapCloudi',
                     'quantity' => $order->quantity,
                     'unit_amount' => $price['amount'],
+                    'subtotal_amount' => $order->subtotal_amount ?? $price['amount'] * $order->quantity,
+                    'discount_amount' => $order->discount_amount,
                     'amount' => $order->amount,
                     'currency' => $order->currency,
                 ],

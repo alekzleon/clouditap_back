@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Card;
+use App\Models\CouponRedemption;
 use App\Models\Order;
 use App\Models\UserCardCredit;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class CardPurchasePaymentService
 
                 $credits = $this->cardCreditsForUser($lockedOrder->user_id);
                 $credits->increment('purchased', $lockedOrder->quantity);
+                $this->recordCouponRedemption($lockedOrder);
                 $justMarkedPaid = true;
             } else {
                 $credits = $this->cardCreditsForUser($lockedOrder->user_id);
@@ -115,6 +117,22 @@ class CardPurchasePaymentService
             [
                 'purchased' => Card::where('user_id', $userId)->count(),
                 'used' => Card::where('user_id', $userId)->count(),
+            ]
+        );
+    }
+
+    private function recordCouponRedemption(Order $order): void
+    {
+        if (! $order->coupon_id || $order->discount_amount <= 0) {
+            return;
+        }
+
+        CouponRedemption::firstOrCreate(
+            ['order_id' => $order->id],
+            [
+                'coupon_id' => $order->coupon_id,
+                'user_id' => $order->user_id,
+                'discount_amount' => $order->discount_amount,
             ]
         );
     }
